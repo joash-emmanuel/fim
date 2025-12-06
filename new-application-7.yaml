@@ -1,0 +1,102 @@
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageRepository
+metadata:
+  name: new-application-7-repository
+  namespace: test
+spec:
+  image: 711387104516.dkr.ecr.us-west-2.amazonaws.com/new-application-7
+  interval: 1m0s
+  provider: aws
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta1
+kind: ImagePolicy
+metadata:
+  name: new-application-7-policy
+  namespace: test
+spec:
+  imageRepositoryRef:
+    name: new-application-7-repository
+  filterTags:
+    pattern: '^prod-\d+-(?P<ts>\d{14})$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: new-application-7
+    Environment: production
+    CreatedBy: joash-emmanuel
+    Owner: joash-emmanuel
+  name: new-application-7-deployment
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: new-application-7
+      Environment: production
+      CreatedBy: joash-emmanuel
+      Owner: joash-emmanuel
+  template:
+    metadata:
+      labels:
+        app:  new-application-7
+        Environment: production
+        CreatedBy: joash-emmanuel
+        Owner: joash-emmanuel
+    spec:
+      containers:
+        - name: new-application-7
+          image: 711387104516.dkr.ecr.us-west-2.amazonaws.com/new-application-7:prod-5-20250602100552 # {"$imagepolicy": "test:new-application-7-policy"}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+              privileged: true
+              runAsUser: 0
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: readiness-path
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+            successThreshold: 1
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: liveness-path
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 150m
+              memory: 150Mi
+            limits:
+              cpu: 400m
+              memory: 400Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: new-application-7-service
+  namespace: test
+  labels:
+    run: new-application-7-service
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+      name: new-application-7-service
+  selector:
+    app: new-application-7
+  type: ClusterIP
